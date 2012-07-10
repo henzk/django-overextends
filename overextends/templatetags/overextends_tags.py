@@ -2,7 +2,7 @@
 from django import template
 from django.template import Template, TemplateSyntaxError, TemplateDoesNotExist
 from django.template.loader_tags import ExtendsNode
-from django.template.loader import find_template_loader
+from django.template.loader import find_template_loader, find_template
 
 
 register = template.Library()
@@ -115,3 +115,57 @@ def overextends(parser, token):
         raise TemplateSyntaxError("'%s' cannot appear more than once "
                                   "in the same template" % bits[0])
     return OverExtendsNode(nodelist, parent_name, None)
+
+
+_LOADER = None
+
+def _get_loader():
+    global _LOADER
+    if _LOADER is None:
+        from django.conf import settings
+        loaders = []
+        for loader_name in settings.TEMPLATE_LOADERS:
+            loader = find_template_loader(loader_name)
+            loaders.extend(getattr(loader, "loaders", [loader]))
+        if len(loaders) != 1:
+            raise Exception(
+                'TEMPLATE_LOADERS may only contain a single loader!'
+            )
+        if not hasattr(loaders[0], 'supports_superimposition'):
+            raise Exception(
+                'The loader in TEMPLATE_LOADERS '
+                'does not support superimposition'
+            )
+        _LOADER = loaders[0]
+    return _LOADER
+
+class SuperimposeNode(ExtendsNode):
+    template_index = -1
+    template_name = ''
+    parent = None
+
+    def find_template(self, name):
+        loader = _get_loader()
+        template, display_name = loader.load_template(name, start_index=self.template_index + 1)
+        if display_name is None:
+            return template
+        else:
+            raise Exception(
+                'FIXME! TemplateDoesNotExist caught in load_template'
+            )
+
+    def get_parent(self, context):
+        if not self.parent:
+            self.parent = self.find_template(self.template_name)
+        return self.parent
+
+@register.tag
+def superimpose(parser, token):
+    bits = token.split_contents()
+    if len(bits) != 1:
+        raise TemplateSyntaxError("'%s' takes no arguments" % bits[0])
+    nodelist = parser.parse()
+    if nodelist.get_nodes_by_type(ExtendsNode):
+        raise TemplateSyntaxError("'%s' cannot appear more than once "
+                                  "in the same template" % bits[0])
+    return SuperimposeNode(nodelist, None, None)

@@ -37,6 +37,7 @@ class Tests(TestCase):
         """
         Put the test template into a couple of test apps and the project.
         """
+
         #force rebuilding of loader searchpath
         from overextends import loader
         loader.TEMPLATE_SEARCHPATH = None
@@ -46,7 +47,7 @@ class Tests(TestCase):
 
         # Add the test apps to INSTALLED_APPS.
         self.unique_id = str(uuid4()).replace("-", "")
-        self.test_apps = ["app%s%s" % (i, self.unique_id) for i in range(2)]
+        self.test_apps = ["app%s%s" % (i, self.unique_id) for i in range(80)]
         settings.INSTALLED_APPS = []#list(settings.INSTALLED_APPS)
         settings.INSTALLED_APPS.extend(self.test_apps)
 
@@ -86,12 +87,13 @@ class Tests(TestCase):
                 "super_string": "",
             }
             if extends:
-                extends_string = "{%% overextends \"%s\" %%}" % self.unique_id
+                #extends_string = "{%% overextends \"%s\" %%}" % self.unique_id
+                extends_string = '{% superimpose %}'
                 template_vars["extends_string"] = extends_string
                 template_vars["super_string"] = "{{ block.super }}"
             f.write((TEST_TEMPLATE % template_vars).strip())
 
-    def test_overextends(self):
+    def test_superimpose(self):
         """
         Ensure the test string appear in the rendered template.
         """
@@ -113,5 +115,3 @@ class Tests(TestCase):
             os.remove(os.path.join(self.root, "templates", self.unique_id))
         else:
             rmtree(os.path.join(self.root, "templates"))
-
-from overextends.test_superimpose import Tests as SuperimposeTests
